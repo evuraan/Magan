@@ -37,7 +37,7 @@ Usage: ./magan [options]
 
 
 ### to listen on non-privileged port
-You don't need root privilages if you are using port > 1024: 
+You don't need root privileges if you are using port > 1024: 
 <pre>
 $ ./magan-armv7l -p 3131
 Thu Apr  4 19:34:48 2019 Magan[26795]: Magan/1.2
