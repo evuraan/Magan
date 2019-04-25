@@ -160,7 +160,7 @@ curl_version_info_data  *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/1.2.9c";
+char Version[] = "Magan/1.3.0c";
 int LISTEN_PORT = 53;
 int debug = 0;
 
@@ -561,7 +561,7 @@ void *HandleNewIncomingTCP(void *vargp){
 int find_null(char *some_word){
 	char This_word[4096];
 	memset(This_word, 0, 4096);
-        memcpy(This_word, some_word, 4096);
+        memcpy(This_word, some_word, strlen(some_word) );
         int i = 0;
         for (; i < 4096; i++){
                 if (This_word[i] == 0){
@@ -1519,7 +1519,7 @@ void findNthWord(char *line_in, int n, char *word){
 	// since we decay, copy the incoming to another buffer
 	char line[bufsize];
 	memset(line, 0, bufsize);
-	memcpy(line, line_in, bufsize);
+	memcpy(line, line_in, strlen(line_in) );
 
         int i = 0;
         char delim[] = " " ;
