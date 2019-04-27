@@ -160,7 +160,7 @@ curl_version_info_data  *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/1.3.0c";
+char Version[] = "Magan/1.3.1c";
 int LISTEN_PORT = 53;
 int debug = 0;
 
@@ -869,7 +869,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 			R += end_here + 1 ;
 			reply->sendSize += end_here + 1;
 
-			if ( ( answer_type == 2) ||  (answer_type == 5) || ( answer_type == 12) || (answer_type == 16) ) {
+			if ( ( answer_type == 2) ||  (answer_type == 5) || ( answer_type == 12)  ) {
 
                                 memset(con_ns, 0 , 1024);
 
@@ -889,6 +889,33 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 				memcpy(R, con_ns, nslen);
 				reply->sendSize += nslen;
 				R += nslen;
+
+			} else if ( (answer_type == 99) ||  ( answer_type == 16 ) ){
+
+                                memset(con_ns, 0 , 1024);
+				char *mehu = (char *)json_object_get_string(data);
+				con_ns[0] = strlen(mehu);
+				for (int i = 0; i < strlen(mehu); i++){
+					con_ns[i + 1] = mehu[i];
+				}
+
+				int nslen = strlen(con_ns);
+				printf("cons len: %d  nslen: %d\n", con_ns[0], nslen );
+				struct dns_rr dns_rr;
+				dns_rr.type = htons(answer_type);
+				dns_rr.class = htons(1);
+				dns_rr.ttl = htonl(json_object_get_int(TTL) );
+				dns_rr.rdlength = htons(nslen);
+
+				memcpy(R, &dns_rr, sizeof(dns_rr) );
+				R += sizeof(dns_rr) ;
+				reply->sendSize += sizeof(dns_rr) ;
+
+				memcpy(R, con_ns, nslen);
+				reply->sendSize += nslen;
+				R += nslen ;
+
+
 			} else if ( answer_type == 15){
 
                                 memset(con_ns, 0 , 1024);
