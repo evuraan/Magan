@@ -2,7 +2,7 @@
 
 Magan is a DNS over HTTPS (DoH) server. 
 
-The [C](https://github.com/evuraan/Magan/blob/master/src/magan.c) version is recommended; also available is the [Go](https://github.com/evuraan/Magan/blob/master/src/magan_go.go) variant. 
+The [C](https://github.com/evuraan/Magan/blob/master/src/magan.c) version is recommended; also available are the [Go](https://github.com/evuraan/Magan/blob/master/src/magan_go.go)  and [Python3](https://github.com/evuraan/Magan/blob/master/src/magan.py) variants. 
 
 A few pre-built binaries for Linux and Windows are available [here](https://github.com/evuraan/Magan/tree/master/bin).
 
@@ -23,6 +23,22 @@ $ gcc  magan.c -pthread -lcurl -ljson-c -o magan-$(uname -m)
 
 ### Building the Go variant
 See [`make_go_binaries.sh`](https://github.com/evuraan/Magan/blob/master/scripts/make_go_binaries.sh) 
+
+### The Python3 Version
+We need latest [`scapy`](https://github.com/secdev/scapy):
+
+<pre>
+$ pip3 install scapy
+</pre>
+and then:
+<pre>
+$ ./magan.py -h
+Usage:
+  -h  --help         print this usage and exit
+  -p  --port         alternate port to listen
+  -v  --version      print version information and exit
+</pre>
+
 
 
 ## Basic Usage
