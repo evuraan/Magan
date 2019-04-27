@@ -900,7 +900,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 				}
 
 				int nslen = strlen(con_ns);
-				printf("cons len: %d  nslen: %d\n", con_ns[0], nslen );
+				//printf("cons len: %d  nslen: %d\n", con_ns[0], nslen );
 				struct dns_rr dns_rr;
 				dns_rr.type = htons(answer_type);
 				dns_rr.class = htons(1);
