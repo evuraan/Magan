@@ -160,7 +160,7 @@ curl_version_info_data  *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/1.3.1c";
+char Version[] = "Magan/1.3.2c";
 int LISTEN_PORT = 53;
 int debug = 0;
 
@@ -894,13 +894,13 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 
                                 memset(con_ns, 0 , 1024);
 				char *mehu = (char *)json_object_get_string(data);
-				con_ns[0] = strlen(mehu);
-				for (int i = 0; i < strlen(mehu); i++){
+				int len = strlen(mehu);
+				con_ns[0] = len;
+				for (int i = 0; i < len; i++){
 					con_ns[i + 1] = mehu[i];
 				}
 
 				int nslen = strlen(con_ns);
-				//printf("cons len: %d  nslen: %d\n", con_ns[0], nslen );
 				struct dns_rr dns_rr;
 				dns_rr.type = htons(answer_type);
 				dns_rr.class = htons(1);
