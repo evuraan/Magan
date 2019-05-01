@@ -160,7 +160,7 @@ curl_version_info_data  *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/1.3.2c";
+char Version[] = "Magan/1.3.3c";
 int LISTEN_PORT = 53;
 int debug = 0;
 
@@ -859,8 +859,8 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
                         json_object_object_get_ex(parsed_json_b, "data", &data);
 			int answer_type = json_object_get_int(type) ;
 
-			char con_ns[1024];
-			memset(con_ns,0, 1024);
+			char con_ns[bufsize];
+			memset(con_ns,0, bufsize);
 			char *interim_buf =  (char *)json_object_get_string(name) ;
 			convert(con_ns, interim_buf);
 			int end_here = strlen(con_ns) ;
@@ -871,7 +871,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 
 			if ( ( answer_type == 2) ||  (answer_type == 5) || ( answer_type == 12)  ) {
 
-                                memset(con_ns, 0 , 1024);
+                                memset(con_ns, 0 , bufsize);
 
 				char *mehu = (char *)json_object_get_string(data);
 				convert(con_ns, mehu);
@@ -892,12 +892,46 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 
 			} else if ( (answer_type == 99) ||  ( answer_type == 16 ) ){
 
-                                memset(con_ns, 0 , 1024);
+                                memset(con_ns, 0 , bufsize);
+				int watermark = 255;
 				char *mehu = (char *)json_object_get_string(data);
 				int len = strlen(mehu);
-				con_ns[0] = len;
-				for (int i = 0; i < len; i++){
-					con_ns[i + 1] = mehu[i];
+				char *mehu_ptr = mehu;
+				char *con_ns_ptr = con_ns;
+				
+				if (len <= watermark ) {
+					con_ns[0] = len;
+					for (int i = 0; i < len; i++){
+						con_ns[i + 1] = mehu[i];
+					}
+				} else { 
+					int x = len / watermark;
+					int this_slice_len = 0;
+					for (int i = 0; i < (x + 1); i++){
+						char mytemp[bufsize];
+						memset(mytemp, 0 , bufsize);
+						char *mytemp_ptr = mytemp;
+						if ( i == 0 ){
+							// this slice is watermark long 
+							this_slice_len = watermark;
+						} else { 
+							// could this be another ginormous slice?
+							int mehu_ptr_len = strlen(mehu_ptr); // so we dont repeat strlen call
+							if ( mehu_ptr_len >= watermark ){
+								this_slice_len = watermark;
+							} else { 
+								this_slice_len = mehu_ptr_len;
+							}
+						}
+						mytemp[0] = this_slice_len;
+						mytemp_ptr += 1;
+						memcpy(mytemp_ptr, mehu_ptr, this_slice_len);
+						mytemp_ptr += this_slice_len;
+						mehu_ptr += this_slice_len;
+						memcpy(con_ns_ptr, mytemp, (1 + this_slice_len) );
+						con_ns_ptr += (1 + this_slice_len);
+					}	
+
 				}
 
 				int nslen = strlen(con_ns);
@@ -918,7 +952,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 
 			} else if ( answer_type == 15){
 
-                                memset(con_ns, 0 , 1024);
+                                memset(con_ns, 0 , bufsize);
 
 
                                 char *mehu = (char *)json_object_get_string(data);
