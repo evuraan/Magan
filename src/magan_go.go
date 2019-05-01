@@ -16,7 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  * ----------------------------------------------------------------------------
- */
+*/
 package main
 
 import (
@@ -40,7 +40,7 @@ import (
 
 const (
 	binary_name = "Magan"
-	Version     = "Magan/1.2.8g"
+	Version     = "Magan/1.3.0g"
 )
 
 type Response struct {
@@ -121,8 +121,8 @@ func main() {
 
 	tag = fmt.Sprintf("%s[%d]", binary_name, os.Getpid())
 	Port := ":" + port
-	print("%s Copyright (C) 2019 Evuraan <evuraan@gmail.com>", Version);
-	print("This program comes with ABSOLUTELY NO WARRANTY.");
+	print("%s Copyright (C) 2019 Evuraan <evuraan@gmail.com>", Version)
+	print("This program comes with ABSOLUTELY NO WARRANTY.")
 	setup_udp_stuff(Port)
 
 }
@@ -188,6 +188,10 @@ func do_tcp_thingy(conn net.Conn) {
 	print("TCP Recvd %d bytes from %s", n, conn.RemoteAddr())
 	checkerr(err)
 	buf := gather_reply(buffer[2:])
+	if buf == nil {
+		return
+	}
+
 	tcp_length_thingy := uint16(buf.Len())
 
 	tcp_reply := &bytes.Buffer{}
@@ -279,11 +283,29 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 				a := [4]byte{}
 				copy(a[:], taba.To4())
 				binary.Write(buf, binary.BigEndian, a)
-			case 2, 5, 12, 16:
+			case 2, 5, 12:
 				mehu := convert(response.Answer[i].Data)
 				dns_rr.RDLEN = uint16(len(mehu))
 				binary.Write(buf, binary.BigEndian, dns_rr)
 				buf.Write([]byte(mehu))
+			case 16, 99:
+				all_raw := response.Answer[i].Data
+				var mehu string
+				this_len := len(all_raw)
+				if this_len < 255 {
+					var b strings.Builder
+					b.Grow(this_len + 5)
+					fmt.Fprintf(&b, "%c%s", this_len, all_raw)
+					mehu = b.String()
+				} else {
+					//fmt.Println("Call in the big guns for", all_raw)
+					mehu = try_this(all_raw)
+				}
+				//fmt.Println("mehu", mehu)
+				dns_rr.RDLEN = uint16(len(mehu))
+				binary.Write(buf, binary.BigEndian, dns_rr)
+				buf.Write([]byte(mehu))
+
 			case 28:
 				dns_rr.RDLEN = 16
 				binary.Write(buf, binary.BigEndian, dns_rr)
@@ -349,8 +371,11 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 
 func send_udp_reply(query_buffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Protocol int) {
 
-
 	buf := gather_reply(query_buffer)
+
+	if buf == nil {
+		return
+	}
 
 	if Protocol == syscall.SOCK_DGRAM {
 		size_est := buf.Len()
@@ -411,4 +436,38 @@ func print(strings string, args ...interface{}) {
 	layout := "Mon Jan 02 15:04:05 2006"
 	msg := fmt.Sprintf(strings, args...)
 	fmt.Println(a.Format(layout), tag, msg)
+}
+
+func try_this(input string) string {
+
+	watermark := 110 // Go throws a fit if this is larger than 127
+	input_len := len(input)
+	var b strings.Builder
+	b.Grow(input_len + 5)
+	loop_count := input_len/watermark + 1
+
+	start := 0
+	end := 0
+	for i := 0; i < loop_count; i++ {
+		chunk := input[start:]
+		if len(chunk) > watermark {
+			// too large
+			end = start + watermark
+			chunk = input[start:end]
+		}
+
+		fmt.Fprintf(&b, "%c", len(chunk))
+
+		for _, v := range chunk {
+			fmt.Fprintf(&b, "%c", v)
+		}
+
+		start = end
+
+	}
+
+	out := b.String()
+	//fmt.Println("out len", len(out) )
+	return out
+
 }
