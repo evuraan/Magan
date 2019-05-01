@@ -1,6 +1,10 @@
 # Magan
 
-Magan is a DNS over HTTPS (DoH) server. 
+Magan is a DNS over HTTPS ([DoH](https://en.wikipedia.org/wiki/DNS_over_HTTPS)) server. 
+
+DNS dates back to the gentler days of Internet when clear text transmissions were considered quite OK. These days, there is increasing awareness among users to encrypt their traffic, including DNS. 
+
+**Magan** handles your incoming DNS requests and retrieves appropriate responses from [Google Public DNS](https://developers.google.com/speed/public-dns/docs/dns-over-https) over HTTPS - thereby encrypting your otherwise clear-text DNS traffic.
 
 The [C](https://github.com/evuraan/Magan/blob/master/src/magan.c) version is recommended; also available are the [Go](https://github.com/evuraan/Magan/blob/master/src/magan_go.go)  and [Python3](https://github.com/evuraan/Magan/blob/master/src/magan.py) variants. 
 
