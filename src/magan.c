@@ -160,7 +160,7 @@ curl_version_info_data  *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/1.3.3c";
+char Version[] = "Magan/1.3.4c";
 int LISTEN_PORT = 53;
 int debug = 0;
 
@@ -486,7 +486,7 @@ void *tcp_listener(void *vargp){
 
 
                 //int rc = pthread_create(&tid, NULL, HandleNewIncomingTCP, &newsocket);
-                int rc = pthread_create(&tid, &attr, HandleNewIncomingTCP, &newsocket);
+                int rc = pthread_create(&tid, &attr, HandleNewIncomingTCP, (void *)newsocket);
                 //assert (rc == 0);
 		if (rc != 0){
 			perror("whoa! too many tcp threads?");
@@ -501,8 +501,7 @@ void *tcp_listener(void *vargp){
 
 void *HandleNewIncomingTCP(void *vargp){
         pthread_detach(pthread_self());
-        int *Socket = (int *) vargp;
-        int newsocket = *Socket;
+        int newsocket = (int)vargp;
 
         char ReadThis[bufsize];
         char sendThis[bufsize];
