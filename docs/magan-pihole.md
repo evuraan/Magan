@@ -16,6 +16,7 @@ $ mkdir $HOME/magan && cd $HOME/magan
 $ wget https://github.com/evuraan/Magan/raw/master/src/magan.c -O magan.c 
 $ gcc  magan.c -pthread -lcurl -ljson-c -o magan
 </pre>
+For Go and Python variants, [see install instructions.](https://github.com/evuraan/Magan#build-instructions) 
 
 To quickly verify your progress so far:
 
