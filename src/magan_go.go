@@ -21,6 +21,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -40,7 +41,7 @@ import (
 
 const (
 	binary_name = "Magan"
-	Version     = "Magan/1.3.0g"
+	Version     = "Magan/1.3.1h"
 )
 
 type Response struct {
@@ -80,8 +81,12 @@ type waist_down struct {
 }
 
 var (
-	a   int = 31
-	tag string
+	a           int = 31
+	tag         string
+	nameservers = []string{"1.1.1.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"}
+	resolver    *net.Resolver
+	dialer      *net.Dialer
+	useAddress  = ""
 )
 
 func main() {
@@ -123,6 +128,7 @@ func main() {
 	Port := ":" + port
 	print("%s Copyright (C) 2019 Evuraan <evuraan@gmail.com>", Version)
 	print("This program comes with ABSOLUTELY NO WARRANTY.")
+	go do_lookup()
 	setup_udp_stuff(Port)
 
 }
@@ -224,10 +230,23 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 	var waist_down waist_down
 	waist_down.qdcount = 1
 	buf := &bytes.Buffer{}
-	timeout := time.Duration(15 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
+
+	dialer = &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
 	}
+
+	if useAddress != "" {
+		http.DefaultTransport.(*http.Transport).DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if addr == "dns.google.com:443" {
+				addr = useAddress + ":443"
+			}
+			return dialer.DialContext(ctx, network, addr)
+		}
+	}
+
+	client := http.Client{}
 
 	req, err := http.NewRequest("GET", url, nil)
 	checkerr(err)
@@ -469,5 +488,83 @@ func try_this(input string) string {
 	out := b.String()
 	//fmt.Println("out len", len(out) )
 	return out
+
+}
+
+func do_lookup() {
+
+	// Scope: See if we can figure out an address to send https requests to..
+
+	if useAddress != "" {
+		return
+	}
+
+	lookFor := "dns.Google.Com"
+
+	// try against []nameservers 1st
+	for _, nameserver := range nameservers {
+		print("Initial lookup: Trying %s", nameserver)
+		if nameserver != "" {
+			resolver = &net.Resolver{
+				PreferGo: true,
+				Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+					d := net.Dialer{}
+					return d.DialContext(ctx, "udp", net.JoinHostPort(nameserver, "53"))
+				},
+			}
+		} else {
+			resolver = net.DefaultResolver
+		}
+
+		c1 := make(chan string, 1)
+		go func() {
+			ips, err := resolver.LookupIPAddr(context.Background(), lookFor)
+			if err != nil {
+				fmt.Println("err", err)
+			} else {
+				useAddress = ips[0].String()
+				c1 <- "Done!"
+			}
+		}()
+
+		select {
+		case <-c1:
+			print("Yay! %s %s source: %s", lookFor, useAddress, nameserver)
+		case <-time.After(2 * time.Second):
+			print("%s", "Timed out!")
+		}
+
+		if useAddress != "" {
+			print("We will use address %s", useAddress)
+			return
+		}
+	}
+
+	if useAddress == "" {
+		// one last try, against whatever default resolver we have set on this system
+		c2 := make(chan string, 1)
+		go func() {
+			print("Tryng system default name resolver")
+			ips, err := net.LookupIP(lookFor)
+			if err != nil {
+				fmt.Println("Err", err)
+			} else {
+				useAddress = ips[0].String()
+				c2 <- "Done!"
+			}
+		}()
+		select {
+		case <-c2:
+			print("Yay! %s %s", lookFor, useAddress)
+		case <-time.After(2 * time.Second):
+			print("%s", "Timed out!")
+		}
+
+		if useAddress == "" {
+			print("Unable to resolve %s. This may become fatal!", lookFor)
+		} else {
+			return
+		}
+	}
 
 }
