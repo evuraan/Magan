@@ -89,24 +89,3 @@ If you are running as root, then:
 */5 * * * *    root     /usr/local/bin/magan -p 53 1>/dev/null 2>/dev/null
 </pre>
 
-## Notes
-### i/o timeout
-With the Go variant, you may encounter this chicken or the egg situation if it is unable to do the required lookup during init. 
-<pre>
-# ./magan-go-linux-amd64 
-Sun Apr 21 12:44:49 2019 Magan[25404] Magan/1.2.8g
-Sun Apr 21 12:44:49 2019 Magan[25404] Port :53
-Sun Apr 21 12:44:49 2019 Magan[25404] Ready!
-Sun Apr 21 12:44:56 2019 Magan[25404] UDP Recvd 32 bytes from 127.0.0.1:54952
-Error: Get https://dns.google.com/resolve?name=dns.google.com.&type=AAAA: dial tcp: lookup dns.google.com on 127.0.0.1:53: read udp 127.0.0.1:54952->127.0.0.1:53: i/o timeout
-Error: Get https://dns.google.com/resolve?name=dns.google.com.&type=A: dial tcp: lookup dns.google.com on 127.0.0.1:53: read udp 127.0.0.1:54952->127.0.0.1:53: i/o timeout
-2019/04/21 12:45:01 Get https://dns.google.com/resolve?name=dns.google.com.&type=AAAA: dial tcp: lookup dns.google.com on 127.0.0.1:53: read udp 127.0.0.1:54952->127.0.0.1:53: i/o timeout
-2019/04/21 12:45:01 Get https://dns.google.com/resolve?name=dns.google.com.&type=A: dial tcp: lookup dns.google.com on 127.0.0.1:53: read udp 127.0.0.1:54952->127.0.0.1:53: i/o timeout
-</pre>
-
-One workaround is to start magan after [`update_etc_hosts_dns_google.sh`](https://github.com/evuraan/Magan/blob/master/scripts/update_etc_hosts_dns_google.sh) finishes:
-
-<pre>
-$ sudo ./update_etc_hosts_dns_google.sh 
-$ sudo magan-go-linux-amd64
-</Pre>
