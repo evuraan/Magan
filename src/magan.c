@@ -160,7 +160,7 @@ curl_version_info_data  *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/1.3.4c";
+char Version[] = "Magan/1.3.5c";
 int LISTEN_PORT = 53;
 int debug = 0;
 
@@ -397,8 +397,7 @@ void *send_udp_response(void *vargp){
 	int PROTO = SOCK_DGRAM;
 	struct reply reply;
 	reply.sendSize = 0;
-	char sendThis[bufsize];
-	memset(sendThis, 0, bufsize);
+	char sendThis[bufsize] = {0};
 	reply.sendThis = sendThis;
 	//get_reply(udp_sender_thread_thingy->buffer, PROTO, &reply);
 
@@ -558,8 +557,7 @@ void *HandleNewIncomingTCP(void *vargp){
 
 
 int find_null(char *some_word){
-	char This_word[4096];
-	memset(This_word, 0, 4096);
+	char This_word[4096] = {0};
         memcpy(This_word, some_word, strlen(some_word) );
         int i = 0;
         for (; i < 4096; i++){
@@ -579,8 +577,7 @@ int find_null(char *some_word){
 
 void read_back(char *label_in, int len, char *buffer){
 
-        char label[1024];
-	memset(label, 0, 1024);
+        char label[1024] = {0};
         memcpy(&label, label_in, 1024);
         char *we_made = buffer;
         //for (int i = 1; i <= (len - 1 ) ; i++){
@@ -674,11 +671,9 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 	int end = find_null(r);
 
 
-	char question[1024];
-	memset(question, 0, 1024);
+	char question[1024] = {0};
 	memcpy(&question, r, 1024);
-	char readable[bufsize];
-	memset(readable, 0, bufsize);
+	char readable[bufsize] = {0};
 	read_back(question, end, readable);
 	//printf("Question: %s\n", readable);
 
@@ -692,8 +687,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 
         //printf("%s %s[%d]: QueryId: %d, Question: %s, Type: %d\n", get_currentTime(), Name, pid, ntohs(header.id), readable, ntohs(dns_question.type) );
 
-	char Google_url[bufsize];
-	memset(Google_url, 0 , bufsize);
+	char Google_url[bufsize] = {0};
 	snprintf(Google_url, 4096, "%sresolve?name=%s&type=%d", getter_url,readable,ntohs(dns_question.type) );
 
 	//printf("Google_url: %s\n" , Google_url);
@@ -701,8 +695,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 	
 
 	int Question_Size = end + 1 + sizeof(dns_question) ;
-	char Question[bufsize];
-	memset(Question, 0, bufsize);
+	char Question[bufsize] = {0};
 
 	memcpy(&Question, Question_start,  Question_Size );
 	//printf("for lols, question is %s\n", Question);
@@ -713,11 +706,14 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 	int rcode = 0;
 	struct dns_header reply_header; 
 	memcpy(&reply_header, &header, sizeof(header) ); // copy header from request,
-	char json_buffer[bufsize];
-	memset(json_buffer, 0, bufsize);
+	char json_buffer[bufsize] = {0};
 	
 	// lets do the curl in here..
 	struct Node *Node = get_CURLHANDLE();
+	if (!Node){
+		fprintf(stderr, "get_CURLHANDLE returned null, this won't fly. Error 33\n");
+		_exit(1);
+	}
 	debug_print("Node %p, handle %p, Usage: %d\n", Node, Node->handle, (Node->Count + 1) );
 	CURL *hnd = Node->handle;
 	//printf("Mutex would be at %p\n", Node->NodeMutex);
@@ -858,8 +854,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
                         json_object_object_get_ex(parsed_json_b, "data", &data);
 			int answer_type = json_object_get_int(type) ;
 
-			char con_ns[bufsize];
-			memset(con_ns,0, bufsize);
+			char con_ns[bufsize] = {0};
 			char *interim_buf =  (char *)json_object_get_string(name) ;
 			convert(con_ns, interim_buf);
 			int end_here = strlen(con_ns) ;
@@ -907,8 +902,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 					int x = len / watermark;
 					int this_slice_len = 0;
 					for (int i = 0; i < (x + 1); i++){
-						char mytemp[bufsize];
-						memset(mytemp, 0 , bufsize);
+						char mytemp[bufsize] = {0};
 						char *mytemp_ptr = mytemp;
 						if ( i == 0 ){
 							// this slice is watermark long 
@@ -956,8 +950,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
 
                                 char *mehu = (char *)json_object_get_string(data);
 
-				char scratch_text[512];
-				memset(scratch_text,0, 512);
+				char scratch_text[512] = {0};
 				findNthWord(mehu, 0, scratch_text);
 				debug_print("prio scratch; %s\n", scratch_text);
 
@@ -1044,27 +1037,16 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
                                 char *mehu = (char *)json_object_get_string(data);
 				// data: ns1.google.com. dns-admin.google.com. 240756130 900 900 1800 60
 	
-				char MNAME[1024];
-				char RNAME[1024];
+				char MNAME[1024] = {0};
+				char RNAME[1024] = {0};
 
-				char MNAME_raw[1024];
-				char RNAME_raw[1024];
-				char SERIAL_char[1024];
-				char REFRESH_char[1024];
-				char RETRY_char[1024];
-				char EXPIRE_char[1024];
-				char MINIMUM_char[1024];
-
-				memset(MNAME, 0, 1024);
-				memset(RNAME, 0, 1024); 
-
-				memset(MNAME_raw, 0, 1024);
-				memset(RNAME_raw, 0, 1024); 
-				memset(SERIAL_char, 0, 1024); 
-				memset(REFRESH_char, 0, 1024); 
-				memset(RETRY_char, 0, 1024); 
-				memset(EXPIRE_char, 0, 1024); 
-				memset(MINIMUM_char, 0, 1024); 
+				char MNAME_raw[1024] = {0};
+				char RNAME_raw[1024] = {0};
+				char SERIAL_char[1024] = {0};
+				char REFRESH_char[1024] = {0};
+				char RETRY_char[1024] = {0};
+				char EXPIRE_char[1024] = {0};
+				char MINIMUM_char[1024] = {0};
 
 				findNthWord(mehu, 0, MNAME_raw);
 				findNthWord(mehu, 1, RNAME_raw);
@@ -1174,8 +1156,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here){
         if (PROTO == SOCK_STREAM){
 
 		uint16_t tcp = htons(reply->sendSize);
-		char newSendy[bufsize];
-		memset(newSendy, 0, bufsize);
+		char newSendy[bufsize] = {0};
 		char *bleh = newSendy;
 		memcpy(bleh, &tcp, sizeof(tcp)); 
 		bleh += sizeof(tcp) ;
@@ -1256,8 +1237,7 @@ void do_lookup(char *resolv_this_input, char *dns_server_input, int Query_Type, 
 	char *dns_server = dns_server_input;
 
 
-	char buffer[4096];
-	memset(buffer,0, 4096);
+	char buffer[4096] = {0};
 	char *p = buffer;
 	
 	int scratch = 0;
@@ -1287,8 +1267,7 @@ void do_lookup(char *resolv_this_input, char *dns_server_input, int Query_Type, 
 	memcpy(p, alavalathi, qname_size);
 	p[qname_size] = 0;
 	
-        char readable[bufsize];
-        memset(readable, 0, bufsize);
+        char readable[bufsize] = {0};
         read_back(p, strlen(alavalathi), readable);
         //debug_print("Question: %s\n", readable);
 
@@ -1305,10 +1284,8 @@ void do_lookup(char *resolv_this_input, char *dns_server_input, int Query_Type, 
 
 	int oursize = question_size + qname_size + header_size;
 
-	char recvbuffer[bufsize];
-	memset(recvbuffer,0, bufsize);
-	char reply[bufsize];
-	memset(reply, 0, bufsize);
+	char recvbuffer[bufsize] = {0};
+	char reply[bufsize] = {0};
 	int sendlen = sendto(client_socket, (char *)buffer, oursize , 0, (struct sockaddr *)&server_address, server_address_len);
 	int recvlen = recvfrom(client_socket, recvbuffer, bufsize, 0, (struct sockaddr *)&server_address, &server_address_len);
 
@@ -1405,12 +1382,10 @@ void convert(char *dns, char *host_in){
 }
 
 void setup_holdmine(){
-	char new_ip[bufsize];
-
-	memset(new_ip,0, bufsize);
+	char new_ip[bufsize] = {0};
         do_lookup(resolv_this, use_ns,1, new_ip);
 	debug_print("dns.google.com is at: %s\n", new_ip);
-        if ( strlen(new_ip) > 8 ){
+        if (new_ip[0]){
 		flashed = (unsigned long)time(NULL);
                 snprintf(holdmine,1024,"%s%s", "dns.google.com:443:", new_ip);
                 debug_print("Updating holdmine to %s\n",  holdmine);
@@ -1520,7 +1495,7 @@ void Prep_HANDLE(struct Node * Node){
 		//printf("%s %s INITIAL: We will continue to use _recent_ holdmine: %s\n",  __func__,  get_currentTime(), holdmine);
 	}
 
-	if ( strlen(holdmine) > 26 ){
+	if (holdmine[0]){
 		//printf("holdmine is %s\n", holdmine);
 		struct curl_slist *slist1 = Node->slist;
 		slist1 = curl_slist_append(NULL, holdmine);
@@ -1577,8 +1552,7 @@ struct Node * get_CURLHANDLE(){
 void findNthWord(char *line_in, int n, char *word){
 
 	// since we decay, copy the incoming to another buffer
-	char line[bufsize];
-	memset(line, 0, bufsize);
+	char line[bufsize] = {0};
 	memcpy(line, line_in, strlen(line_in) );
 
         int i = 0;
