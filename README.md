@@ -10,6 +10,8 @@ The [C](https://github.com/evuraan/Magan/blob/master/src/magan.c) version is rec
 
 A few pre-built binaries for Linux and Windows are available [here](https://github.com/evuraan/Magan/tree/master/bin).
 
+See  [here](https://github.com/evuraan/Magan/tree/master/bin) for running Magan as a Windows OS Service. 
+
 ## Build instructions
 
 ### The C version
@@ -18,6 +20,9 @@ A few pre-built binaries for Linux and Windows are available [here](https://gith
 We need `libcurl4-openssl-dev` and `libjson-c`, usually installed on Debian thusly:
 <pre>
 $ sudo apt install libjson-c libcurl4-openssl-dev
+</pre>
+or, try <pre>
+$ sudo apt install libjson-c-dev libcurl4-openssl-dev 
 </pre>
 Once all the pre-requisites are met, compile magan as:
 <pre>
