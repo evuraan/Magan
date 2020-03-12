@@ -3,6 +3,6 @@
 
 mkdir -vp ../bin
 
-gcc  ../src/magan.c -pthread -lcurl -ljson-c -o ../bin/magan-$(uname -m)
+gcc  -Wall -Wvla -Wextra  ../src/magan.c -pthread -lcurl -ljson-c -o ../bin/magan-$(uname -m)
 strip ../bin/magan-$(uname -m)
 

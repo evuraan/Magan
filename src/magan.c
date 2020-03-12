@@ -149,7 +149,7 @@ curl_version_info_data *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/1.3.5e";
+char Version[] = "Magan/1.3.6c";
 int LISTEN_PORT = 53;
 int debug = 0;
 
@@ -198,7 +198,6 @@ int main(int argc, char *argv[]) {
 			{NULL, 0, NULL, 0}
 		};
 
-		int this_option_optind = optind ? optind : 1;
 		int option_index = 0;
 
 		c = getopt_long(argc, argv, "p:hvd", long_options, &option_index);
@@ -302,6 +301,7 @@ void init() {
 }
 
 void *udp_listener_thread(void *vargp) {
+	(void)vargp;
 	int PROTO = SOCK_DGRAM;
 	int server_socket = socket(AF_INET, PROTO, 0);
 	if (server_socket < 0) {
@@ -311,7 +311,7 @@ void *udp_listener_thread(void *vargp) {
 	//bind
 	struct sockaddr_in myaddr;
 	struct sockaddr_in remoteaddr;
-	int addrlen = sizeof(remoteaddr);
+	uint addrlen = sizeof(remoteaddr);
 
 	myaddr.sin_family = AF_INET;
 	myaddr.sin_addr.s_addr = INADDR_ANY;
@@ -327,8 +327,7 @@ void *udp_listener_thread(void *vargp) {
 	init();
 
 	// any allocations for the while True loop should happen out here
-	char sendThis[bufsize];
-	int sendlen, recvlen;
+	uint recvlen;
 
 	while (1) {
 
@@ -396,6 +395,7 @@ void *send_udp_response(void *vargp) {
 }
 
 void *tcp_listener(void *vargp) {
+	(void)vargp; 
 	int PROTO = SOCK_STREAM;
 
 	// Create socket first
@@ -548,7 +548,7 @@ void read_back(char *label_in, int len, char *buffer) {
 			//puts("Bindi!");
 			we_made[i - 1] = '.';
 
-		} else if (label[i] >= 40 < 192) {
+		} else if  ( (label[i] >= 40) && (label[i] < 192) ) {
 			//printf("We got %d %d char: %c %p \n", i, label[i], label[i], label[i] );
 			we_made[i - 1] = label[i];
 		} else {
@@ -625,7 +625,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 
 	char question[1024] = { 0 };
 	memcpy(&question, r, 1024);
-	char readable[bufsize] = { 0 };
+	char readable[4096] = { 0 };
 	read_back(question, end, readable);
 	//printf("Question: %s\n", readable);
 
@@ -640,7 +640,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 	//printf("%s %s[%d]: QueryId: %d, Question: %s, Type: %d\n", get_currentTime(), Name, pid, ntohs(header.id), readable, ntohs(dns_question.type) );
 
 	char Google_url[bufsize] = { 0 };
-	snprintf(Google_url, 4096, "%sresolve?name=%s&type=%d", getter_url, readable, ntohs(dns_question.type));
+	snprintf(Google_url, bufsize, "%sresolve?name=%s&type=%d", getter_url, readable, ntohs(dns_question.type));
 
 	//printf("Google_url: %s\n" , Google_url);
 	debug_print("Url: %s\n", Google_url);
@@ -933,7 +933,6 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 				char *mehu = (char *)json_object_get_string(data);
 
 				struct sockaddr_in6 sa2;
-				struct sockaddr_in sa;
 				inet_pton(AF_INET6, mehu, &(sa2.sin6_addr));
 
 				struct dns_rr dns_rr;
@@ -1172,12 +1171,12 @@ void do_lookup(char *resolv_this_input, char *dns_server_input, int Query_Type, 
 	char *p = buffer;
 
 	int scratch = 0;
-	struct sockaddr_in my_address, server_address;
+	struct sockaddr_in server_address;
 
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(PORT);
 	server_address.sin_addr.s_addr = inet_addr(dns_server);
-	int server_address_len = sizeof(server_address);
+	uint server_address_len = sizeof(server_address);
 
 	struct dns_header header_thingy;
 	struct dns_header *header = &header_thingy;
@@ -1220,7 +1219,7 @@ void do_lookup(char *resolv_this_input, char *dns_server_input, int Query_Type, 
 	int recvlen = recvfrom(client_socket, recvbuffer, bufsize, 0, (struct sockaddr *)&server_address, &server_address_len);
 
 	//debug_print("sendlen: %d\n", sendlen);
-	//debug_print("recvd %d\n", recvlen);
+	debug_print("recvd %d\n", recvlen);
 	memcpy(reply, &recvbuffer, 4096);
 	char *r = recvbuffer;
 	struct dns_header replyHeader;
@@ -1235,7 +1234,7 @@ void do_lookup(char *resolv_this_input, char *dns_server_input, int Query_Type, 
 		debug_print(" -->  %d Query id.\n", ntohs(replyHeader.id));
 	}
 
-	if (ntohs(replyHeader.ancount) < 0) {
+	if (!ntohs(replyHeader.ancount)) {
 		fprintf(stderr, "Error: ancount: %d\n", ntohs(replyHeader.ancount));
 		_exit(1);
 	}
@@ -1280,7 +1279,7 @@ void convert(char *dns, char *host_in) {
 	char *peg = alloca(len);
 	memset(temp, 0, len);
 	memset(peg, 0, len);
-	for (int i = 0; i < strlen(host); i++) {
+	for (uint i = 0; i < strlen(host); i++) {
 		//printf("%c\n", host[i]);
 		if (host[i] == '.') {
 			//printf("ping %d\n", j);
@@ -1309,7 +1308,7 @@ void convert(char *dns, char *host_in) {
 
 void setup_holdmine() {
 	debug_print("%s says hello!\n", __func__);
-	char new_ip[bufsize] = { 0 };
+	char new_ip[512] = { 0 };
 	do_lookup(resolv_this, use_ns, 1, new_ip);
 	debug_print("dns.google.com is at: %s\n", new_ip);
 	if (new_ip[0]) {
@@ -1481,7 +1480,7 @@ void findNthWord(char *line_in, int n, char *word) {
 	while (LinePtr) {
 		int _len = strlen(LinePtr);
 		if (i == n) {
-			strncpy(Field, LinePtr, strlen(LinePtr) + 1);
+			strncpy(Field, LinePtr, _len + 1);
 			break;
 		}
 
