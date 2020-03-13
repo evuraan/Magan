@@ -41,7 +41,7 @@ import (
 
 const (
 	binary_name = "Magan"
-	Version     = "Magan/1.3.1h"
+	Version     = "Magan/1.3.3b"
 )
 
 type Response struct {
@@ -87,6 +87,7 @@ var (
 	resolver    *net.Resolver
 	dialer      *net.Dialer
 	useAddress  = ""
+	routeTo     = ""
 )
 
 func main() {
@@ -106,6 +107,18 @@ func main() {
 			if arg == "version" || arg == "--version" || arg == "v" || arg == "--v" || arg == "-v" || arg == "-version" {
 				fmt.Println("Version:", Version)
 				os.Exit(0)
+			}
+
+			if arg == "routeTo" || arg == "--routeTo" || arg == "r" || arg == "--r" || arg == "-r" || arg == "-routeTo" {
+				next := i + 1
+				if argc > next {
+					useAddress = os.Args[i+1]
+					routeTo = fmt.Sprintf("[%s]:443", useAddress)
+				} else {
+					fmt.Println("Invalid usage")
+					showhelp()
+					os.Exit(1)
+				}
 			}
 
 			if arg == "port" || arg == "--port" || arg == "p" || arg == "--p" || arg == "-p" || arg == "-port" {
@@ -137,6 +150,7 @@ func showhelp() {
 	fmt.Printf("Usage: %s <port>\n", os.Args[0])
 	fmt.Println("  -h  --help         print this usage and exit")
 	fmt.Println("  -p  --port         alternate port to listen")
+	fmt.Println("  -r  --routeTo      ipaddr for dns.google.com")
 	fmt.Println("  -v  --version      print version information and exit")
 }
 
@@ -159,7 +173,7 @@ func setup_udp_stuff(Port string) {
 	conn, err := net.ListenUDP(Proto, udpaddr)
 	checkerr(err)
 
-	print("Port %s", Port)
+	print("Listening on Port %s", Port)
 	print("Ready!")
 
 	// lets loop over
@@ -170,7 +184,11 @@ func setup_udp_stuff(Port string) {
 		checkerr(err)
 		//fmt.Printf("UDP Recvd %d bytes from %s\n", n, addr)
 		print("UDP Recvd %d bytes from %s", n, addr)
-		go send_udp_reply(buffer, conn, addr, syscall.SOCK_DGRAM)
+		if n < 5 || n == 0 {
+			print("Low watermark, ignoring this likely spurious UDP request")
+		} else {
+			go send_udp_reply(buffer, conn, addr, syscall.SOCK_DGRAM)
+		}
 	}
 
 }
@@ -193,6 +211,11 @@ func do_tcp_thingy(conn net.Conn) {
 	//fmt.Printf("TCP Recvd %d bytes from %s\n", n, conn.RemoteAddr())
 	print("TCP Recvd %d bytes from %s", n, conn.RemoteAddr())
 	checkerr(err)
+	if n < 5 || n == 0 {
+		print("Low watermark, ignoring this likely spurious TCP request")
+		return
+	}
+
 	buf := gather_reply(buffer[2:])
 	if buf == nil {
 		return
@@ -240,7 +263,8 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 	if useAddress != "" {
 		http.DefaultTransport.(*http.Transport).DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == "dns.google.com:443" {
-				addr = useAddress + ":443"
+				addr = routeTo
+				print("Routing to %s\n", addr)
 			}
 			return dialer.DialContext(ctx, network, addr)
 		}
@@ -255,9 +279,8 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 	resp, err := client.Do(req)
 	checkerr(err)
 	defer resp.Body.Close()
-	contents := make([]byte, 8192)
 	if resp.StatusCode == 200 {
-		contents, err = ioutil.ReadAll(resp.Body)
+		contents, err := ioutil.ReadAll(resp.Body)
 		checkerr(err)
 		var response Response
 		json.Unmarshal(contents, &response)
@@ -496,6 +519,7 @@ func do_lookup() {
 	// Scope: See if we can figure out an address to send https requests to..
 
 	if useAddress != "" {
+		print("We will send HTTPS queries to %s", useAddress)
 		return
 	}
 
@@ -522,7 +546,16 @@ func do_lookup() {
 			if err != nil {
 				fmt.Println("err", err)
 			} else {
-				useAddress = ips[0].String()
+				// for now pick an ipv4 address
+				for i := range ips {
+					ip_string := ips[i].String()
+					if strings.Contains(ip_string, ":") {
+						continue
+					} else {
+						useAddress = ip_string
+						break
+					}
+				}
 				c1 <- "Done!"
 			}
 		}()
@@ -534,8 +567,14 @@ func do_lookup() {
 			print("%s", "Timed out!")
 		}
 
+		if useAddress == "" {
+			print("Falling back to 8.8.8.8, this may or may not work for you!")
+			useAddress = "8.8.8.8"
+		}
+
 		if useAddress != "" {
-			print("We will use address %s", useAddress)
+			print("We will send HTTPS queries to %s", useAddress)
+			routeTo = fmt.Sprintf("[%s]:443", useAddress)
 			return
 		}
 	}
