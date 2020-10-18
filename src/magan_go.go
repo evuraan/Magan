@@ -40,10 +40,11 @@ import (
 )
 
 const (
-	binary_name = "Magan"
-	Version     = "Magan/1.3.3b"
+	binaryName = "Magan"
+	version    = "Magan/1.3.3b"
 )
 
+//Response exported
 type Response struct {
 	Status   int        `json:"Status"`
 	TC       bool       `json:"TC"`
@@ -55,10 +56,14 @@ type Response struct {
 	Answer   []Answer   `json:"Answer"`
 	Comment  string     `json:"Comment"`
 }
+
+//Question exported
 type Question struct {
 	Name string `json:"name"`
 	Type int    `json:"type"`
 }
+
+//Answer exported
 type Answer struct {
 	Name string `json:"name"`
 	Type int    `json:"type"`
@@ -66,14 +71,14 @@ type Answer struct {
 	Data string `json:"data"`
 }
 
-type dns_rr struct {
+type dnsRRStruct struct {
 	TYPE  uint16
 	CLASS uint16
 	TTL   uint32
 	RDLEN uint16
 }
 
-type waist_down struct {
+type waistDownStruct struct {
 	qdcount uint16
 	ancount uint16
 	nscount uint16
@@ -105,7 +110,7 @@ func main() {
 			}
 
 			if arg == "version" || arg == "--version" || arg == "v" || arg == "--v" || arg == "-v" || arg == "-version" {
-				fmt.Println("Version:", Version)
+				fmt.Println("version:", version)
 				os.Exit(0)
 			}
 
@@ -137,12 +142,12 @@ func main() {
 		}
 	}
 
-	tag = fmt.Sprintf("%s[%d]", binary_name, os.Getpid())
+	tag = fmt.Sprintf("%s[%d]", binaryName, os.Getpid())
 	Port := ":" + port
-	print("%s Copyright (C) 2019 Evuraan <evuraan@gmail.com>", Version)
+	print("%s Copyright (C) 2019 Evuraan <evuraan@gmail.com>", version)
 	print("This program comes with ABSOLUTELY NO WARRANTY.")
 	go do_lookup()
-	setup_udp_stuff(Port)
+	setupUDPStuff(Port)
 
 }
 
@@ -161,9 +166,9 @@ func checkerr(err error) {
 	}
 }
 
-func setup_udp_stuff(Port string) {
+func setupUDPStuff(Port string) {
 	// this is the best spot to start our tcp listener  as well.
-	go setup_tcp_stuff(Port)
+	go setupTCPStuff(Port)
 	Proto := "udp"
 	// setup *net.UDPAddr first:
 	udpaddr, err := net.ResolveUDPAddr(Proto, Port)
@@ -187,25 +192,25 @@ func setup_udp_stuff(Port string) {
 		if n < 5 || n == 0 {
 			print("Low watermark, ignoring this likely spurious UDP request")
 		} else {
-			go send_udp_reply(buffer, conn, addr, syscall.SOCK_DGRAM)
+			go sendUDPReply(buffer, conn, addr, syscall.SOCK_DGRAM)
 		}
 	}
 
 }
 
-func setup_tcp_stuff(Port string) {
+func setupTCPStuff(Port string) {
 	Proto := "tcp"
-	tcp_Listener, err := net.Listen(Proto, Port)
+	tcpListener, err := net.Listen(Proto, Port)
 	checkerr(err)
-	defer tcp_Listener.Close()
+	defer tcpListener.Close()
 	for {
-		conn, err := tcp_Listener.Accept()
+		conn, err := tcpListener.Accept()
 		checkerr(err)
-		go do_tcp_thingy(conn)
+		go doTCPThingy(conn)
 	}
 }
 
-func do_tcp_thingy(conn net.Conn) {
+func doTCPThingy(conn net.Conn) {
 	buffer := make([]byte, 8192)
 	n, err := conn.Read(buffer)
 	//fmt.Printf("TCP Recvd %d bytes from %s\n", n, conn.RemoteAddr())
@@ -216,25 +221,25 @@ func do_tcp_thingy(conn net.Conn) {
 		return
 	}
 
-	buf := gather_reply(buffer[2:])
+	buf := gatherReply(buffer[2:])
 	if buf == nil {
 		return
 	}
 
-	tcp_length_thingy := uint16(buf.Len())
+	tcpLengthThingy := uint16(buf.Len())
 
-	tcp_reply := &bytes.Buffer{}
-	binary.Write(tcp_reply, binary.BigEndian, tcp_length_thingy)
-	tcp_reply.Write(buf.Bytes())
-	SenT, err := conn.Write(tcp_reply.Bytes())
+	tcpReply := &bytes.Buffer{}
+	binary.Write(tcpReply, binary.BigEndian, tcpLengthThingy)
+	tcpReply.Write(buf.Bytes())
+	SenT, err := conn.Write(tcpReply.Bytes())
 	print("TCP - Replied with %d bytes", SenT)
 	conn.Close()
 }
 
-func gather_reply(query_buffer []uint8) *bytes.Buffer {
+func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 
 	var m dnsmessage.Message
-	err := m.Unpack(query_buffer)
+	err := m.Unpack(queryBuffer)
 	if err != nil {
 		fmt.Println("Error, outta here", err)
 		return nil
@@ -250,8 +255,8 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 	m.RecursionAvailable = true
 	m.Response = true
 
-	var waist_down waist_down
-	waist_down.qdcount = 1
+	var waistDownStruct waistDownStruct
+	waistDownStruct.qdcount = 1
 	buf := &bytes.Buffer{}
 
 	dialer = &net.Dialer{
@@ -274,7 +279,7 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 
 	req, err := http.NewRequest("GET", url, nil)
 	checkerr(err)
-	req.Header.Set("User-Agent", Version)
+	req.Header.Set("User-Agent", version)
 	t1 := time.Now()
 	resp, err := client.Do(req)
 	checkerr(err)
@@ -285,7 +290,7 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 		var response Response
 		json.Unmarshal(contents, &response)
 
-		var ancount_int int = len(response.Answer)
+		var anCountInt int = len(response.Answer)
 		Rcode := response.Status
 
 		if Rcode == 3 {
@@ -300,57 +305,57 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 			m.RCode = 5
 		}
 
-		temp_reply, _ := m.Pack()
+		tempReply, _ := m.Pack()
 
-		waist_down.ancount = uint16(ancount_int)
-		binary.Write(buf, binary.BigEndian, temp_reply[:4])
-		binary.Write(buf, binary.BigEndian, waist_down)
-		binary.Write(buf, binary.BigEndian, temp_reply[12:qlen+12])
+		waistDownStruct.ancount = uint16(anCountInt)
+		binary.Write(buf, binary.BigEndian, tempReply[:4])
+		binary.Write(buf, binary.BigEndian, waistDownStruct)
+		binary.Write(buf, binary.BigEndian, tempReply[12:qlen+12])
 
-		for i := 0; i < ancount_int; i++ {
+		for i := 0; i < anCountInt; i++ {
 
 			converted := convert(response.Answer[i].Name)
 			buf.Write([]byte(converted))
 
-			var dns_rr dns_rr
-			dns_rr.TYPE = uint16(response.Answer[i].Type)
-			dns_rr.CLASS = 1
-			dns_rr.TTL = uint32(response.Answer[i].TTL)
+			var dnsRRStruct dnsRRStruct
+			dnsRRStruct.TYPE = uint16(response.Answer[i].Type)
+			dnsRRStruct.CLASS = 1
+			dnsRRStruct.TTL = uint32(response.Answer[i].TTL)
 
 			switch response.Answer[i].Type {
 			case 1:
-				dns_rr.RDLEN = 4
-				binary.Write(buf, binary.BigEndian, dns_rr)
+				dnsRRStruct.RDLEN = 4
+				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				taba := net.ParseIP(response.Answer[i].Data)
 				a := [4]byte{}
 				copy(a[:], taba.To4())
 				binary.Write(buf, binary.BigEndian, a)
 			case 2, 5, 12:
 				mehu := convert(response.Answer[i].Data)
-				dns_rr.RDLEN = uint16(len(mehu))
-				binary.Write(buf, binary.BigEndian, dns_rr)
+				dnsRRStruct.RDLEN = uint16(len(mehu))
+				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				buf.Write([]byte(mehu))
 			case 16, 99:
-				all_raw := response.Answer[i].Data
+				allRaw := response.Answer[i].Data
 				var mehu string
-				this_len := len(all_raw)
-				if this_len < 255 {
+				thisLen := len(allRaw)
+				if thisLen < 255 {
 					var b strings.Builder
-					b.Grow(this_len + 5)
-					fmt.Fprintf(&b, "%c%s", this_len, all_raw)
+					b.Grow(thisLen + 5)
+					fmt.Fprintf(&b, "%c%s", thisLen, allRaw)
 					mehu = b.String()
 				} else {
-					//fmt.Println("Call in the big guns for", all_raw)
-					mehu = try_this(all_raw)
+					//fmt.Println("Call in the big guns for", allRaw)
+					mehu = tryThis(allRaw)
 				}
 				//fmt.Println("mehu", mehu)
-				dns_rr.RDLEN = uint16(len(mehu))
-				binary.Write(buf, binary.BigEndian, dns_rr)
+				dnsRRStruct.RDLEN = uint16(len(mehu))
+				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				buf.Write([]byte(mehu))
 
 			case 28:
-				dns_rr.RDLEN = 16
-				binary.Write(buf, binary.BigEndian, dns_rr)
+				dnsRRStruct.RDLEN = 16
+				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				taba := net.ParseIP(response.Answer[i].Data)
 				a := [16]byte{}
 				copy(a[:], taba.To16())
@@ -362,9 +367,9 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 				var prio uint16
 				dies, _ := strconv.Atoi(MX[0])
 				prio = uint16(dies)
-				ye_long := uint16(unsafe.Sizeof(prio)) + uint16(len(mehu))
-				dns_rr.RDLEN = ye_long
-				binary.Write(buf, binary.BigEndian, dns_rr)
+				yeLong := uint16(unsafe.Sizeof(prio)) + uint16(len(mehu))
+				dnsRRStruct.RDLEN = yeLong
+				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				binary.Write(buf, binary.BigEndian, prio)
 				buf.Write([]byte(mehu))
 
@@ -372,19 +377,19 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 				NS := strings.Split(response.Answer[i].Data, " ")
 				mname := convert(NS[0])
 				rname := convert(NS[1])
-				serial_atoi, _ := strconv.Atoi(NS[2])
-				serial := uint32(serial_atoi)
-				refresh_atoi, _ := strconv.Atoi(NS[3])
-				refresh := uint32(refresh_atoi)
-				retry_atoi, _ := strconv.Atoi(NS[4])
-				retry := uint32(retry_atoi)
-				expire_atoi, _ := strconv.Atoi(NS[5])
-				expire := uint32(expire_atoi)
-				min_atoi, _ := strconv.Atoi(NS[6])
-				min := uint32(min_atoi)
-				ye_long := uint16(len(mname)) + uint16(len(rname)) + uint16(unsafe.Sizeof(serial)*5)
-				dns_rr.RDLEN = ye_long
-				binary.Write(buf, binary.BigEndian, dns_rr)
+				serialAtoi, _ := strconv.Atoi(NS[2])
+				serial := uint32(serialAtoi)
+				refreshAtoi, _ := strconv.Atoi(NS[3])
+				refresh := uint32(refreshAtoi)
+				retryAtoi, _ := strconv.Atoi(NS[4])
+				retry := uint32(retryAtoi)
+				expireAtoi, _ := strconv.Atoi(NS[5])
+				expire := uint32(expireAtoi)
+				minAtoi, _ := strconv.Atoi(NS[6])
+				min := uint32(minAtoi)
+				yeLong := uint16(len(mname)) + uint16(len(rname)) + uint16(unsafe.Sizeof(serial)*5)
+				dnsRRStruct.RDLEN = yeLong
+				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 
 				buf.Write([]byte(mname))
 				buf.Write([]byte(rname))
@@ -411,22 +416,22 @@ func gather_reply(query_buffer []uint8) *bytes.Buffer {
 	return buf
 }
 
-func send_udp_reply(query_buffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Protocol int) {
+func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Protocol int) {
 
-	buf := gather_reply(query_buffer)
+	buf := gatherReply(queryBuffer)
 
 	if buf == nil {
 		return
 	}
 
 	if Protocol == syscall.SOCK_DGRAM {
-		size_est := buf.Len()
-		if size_est >= 512 {
+		sizeEst := buf.Len()
+		if sizeEst >= 512 {
 
-			print("Too big, %d bytes, sending TC flag", size_est)
+			print("Too big, %d bytes, sending TC flag", sizeEst)
 
 			var m dnsmessage.Message
-			err := m.Unpack(query_buffer)
+			err := m.Unpack(queryBuffer)
 			if err != nil {
 				fmt.Println("Error, outta here", err)
 				return
@@ -434,8 +439,8 @@ func send_udp_reply(query_buffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, 
 
 			m.Response = true
 			m.Truncated = true
-			tc_reply, _ := m.Pack()
-			SenT, err := conn.WriteToUDP(tc_reply, addr)
+			tcReply, _ := m.Pack()
+			SenT, err := conn.WriteToUDP(tcReply, addr)
 			checkerr(err)
 			print("UDP - Replied with %d bytes", SenT)
 			return
@@ -459,8 +464,8 @@ func convert(_input string) string {
 
 	for _, v := range input {
 		if v == '.' {
-			temp_s := temp.String()
-			fmt.Fprintf(&b, "%c%s", j, temp_s)
+			tempS := temp.String()
+			fmt.Fprintf(&b, "%c%s", j, tempS)
 			j = 0
 			temp.Reset()
 		} else {
@@ -480,17 +485,17 @@ func print(strings string, args ...interface{}) {
 	fmt.Println(a.Format(layout), tag, msg)
 }
 
-func try_this(input string) string {
+func tryThis(input string) string {
 
 	watermark := 110 // Go throws a fit if this is larger than 127
-	input_len := len(input)
+	inputLen := len(input)
 	var b strings.Builder
-	b.Grow(input_len + 5)
-	loop_count := input_len/watermark + 1
+	b.Grow(inputLen + 5)
+	loopCount := inputLen/watermark + 1
 
 	start := 0
 	end := 0
-	for i := 0; i < loop_count; i++ {
+	for i := 0; i < loopCount; i++ {
 		chunk := input[start:]
 		if len(chunk) > watermark {
 			// too large
@@ -548,11 +553,11 @@ func do_lookup() {
 			} else {
 				// for now pick an ipv4 address
 				for i := range ips {
-					ip_string := ips[i].String()
-					if strings.Contains(ip_string, ":") {
+					ipString := ips[i].String()
+					if strings.Contains(ipString, ":") {
 						continue
 					} else {
-						useAddress = ip_string
+						useAddress = ipString
 						break
 					}
 				}
