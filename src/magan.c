@@ -395,7 +395,7 @@ void *send_udp_response(void *vargp) {
 }
 
 void *tcp_listener(void *vargp) {
-	(void)vargp; 
+	(void)vargp;
 	int PROTO = SOCK_STREAM;
 
 	// Create socket first
@@ -548,7 +548,7 @@ void read_back(char *label_in, int len, char *buffer) {
 			//puts("Bindi!");
 			we_made[i - 1] = '.';
 
-		} else if  ( (label[i] >= 40) && (label[i] < 192) ) {
+		} else if ((label[i] >= 40) && (label[i] < 192)) {
 			//printf("We got %d %d char: %c %p \n", i, label[i], label[i], label[i] );
 			we_made[i - 1] = label[i];
 		} else {
