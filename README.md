@@ -94,3 +94,6 @@ If you are running as root, then:
 */5 * * * *    root     /usr/local/bin/magan -p 53 1>/dev/null 2>/dev/null
 </pre>
 
+## Changelog
+
+See [Changelog](./Changelog.md)
