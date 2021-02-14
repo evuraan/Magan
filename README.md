@@ -26,7 +26,7 @@ $ sudo apt install libjson-c-dev libcurl4-openssl-dev
 </pre>
 Once all the pre-requisites are met, compile magan as:
 <pre>
-$ gcc  magan.c -pthread -lcurl -ljson-c -o magan-$(uname -m) 
+$ gcc -Wall -Wvla -Wextra magan.c -pthread -lcurl -ljson-c -o magan-$(uname -m) 
 </pre>
 <i>(Also see [`make.sh`](https://github.com/evuraan/Magan/blob/master/scripts/make.sh).)</i>
 
