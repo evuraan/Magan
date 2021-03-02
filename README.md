@@ -3,6 +3,7 @@
 Magan is a DNS over HTTPS ([DoH](https://en.wikipedia.org/wiki/DNS_over_HTTPS)) server. 
 
 DNS dates back to the gentler days of Internet when clear text transmissions were considered quite OK. 
+
 ![Unencrypted DNS Traffic](./unEncryptedDNS.jpg)
 
 These days, there is increasing awareness among users to encrypt their traffic, including DNS. 
