@@ -166,7 +166,7 @@ curl_version_info_data *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/2.0h epoll+pool+cache";
+char Version[] = "Magan/3.0";
 int LISTEN_PORT = 53;
 int debug = 0;
 pthread_t udpWorkers[UDP_THREADS] = { 0 };
@@ -668,8 +668,10 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 	struct dns_question dns_question = { 0 };
 	memcpy(&dns_question, r, sizeof(dns_question));
 
+	uint16_t queType = ntohs(dns_question.type);
+
 	char Google_url[bufsize] = { 0 };
-	snprintf(Google_url, bufsize, "%sresolve?name=%s&type=%d", getter_url, readable, ntohs(dns_question.type));
+	snprintf(Google_url, bufsize, "%sresolve?name=%s&type=%d", getter_url, readable, queType);
 
 	//printf("Google_url: %s\n" , Google_url);
 	debug_print("Url: %s\n", Google_url);
@@ -690,15 +692,25 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 	char awkward[bufsize] = { 0 };
 	int gotData = 0;
 
-	char *json_buffer = getCacheEntry(Google_url);
-	if (!json_buffer) {
-		if (doCurlStuff(Google_url, awkward)) {
-			json_buffer = awkward;
+	char *json_buffer = 0;
+
+	if ((queType == 2) && (!strnlen(readable, 10))) {
+		debug_print("Saying no to likely a +trace query\n");
+	} else {
+		json_buffer = getCacheEntry(Google_url);
+		if (!json_buffer) {
+			if (doCurlStuff(Google_url, awkward)) {
+				json_buffer = awkward;
+				gotData++;
+			}
+		} else {
+			debug_print("Cache hit for %s\n", Google_url);
 			gotData++;
 		}
-	} else {
-		debug_print("Cache hit for %s\n", Google_url);
-		gotData++;
+	}
+
+	if (!json_buffer) {
+		json_buffer = awkward;
 	}
 
 	if (gotData) {
@@ -717,6 +729,8 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 		reply_header.nscount = 0;
 		reply_header.qr = 1;
 	}
+
+
 
 	struct json_object *parsed_json_a, *parsed_json_b;
 	struct json_object *Question_json;
@@ -1464,27 +1478,27 @@ struct Node *get_CURLHANDLE() {
 // max len: ONE_K
 void findNthWord(char *line_in, int n, char *word) {
 
-        // since we decay, copy the incoming to another buffer
-        char line[bufsize] = { 0 };
-        memcpy(line, line_in, strnlen(line_in, ONE_K));
+	// since we decay, copy the incoming to another buffer
+	char line[bufsize] = { 0 };
+	memcpy(line, line_in, strnlen(line_in, ONE_K));
 
-        int i = 0;
-        char delim[] = " ";
-        char *Field = word;
-        char *LinePtr = strtok(line, delim);
-        while (LinePtr) {
-                int _len = strnlen(LinePtr, ONE_K);
-                if (i == n) {
-                        strncpy(Field, LinePtr, _len + 1);
+	int i = 0;
+	char delim[] = " ";
+	char *Field = word;
+	char *LinePtr = strtok(line, delim);
+	while (LinePtr) {
+		int _len = strnlen(LinePtr, ONE_K);
+		if (i == n) {
+			strncpy(Field, LinePtr, _len + 1);
 			// printf("[%s] nth: %d, Field: %s\n", __func__, n, Field);
-                        break;
-                }
+			break;
+		}
 
-                i++;
-                LinePtr = strtok(NULL, delim);
-        }
+		i++;
+		LinePtr = strtok(NULL, delim);
+	}
 
-        return;
+	return;
 }
 
 int debug_print(char *format, ...) {
