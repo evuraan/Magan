@@ -43,9 +43,10 @@ import (
 const (
 	binaryName = "Magan"
 	version    = "Magan/1.5.0a"
-	validity   = 5 * 60 // ache item validity in seconds
+	validity   = 5 * 60 // cache item validity in seconds
 	cacheMax   = 100    // Max items to keep in the cache.
 	interval   = 10     // seconds to wait for house keeping runs
+	lookFor    = "dns.Google.Com"
 )
 
 type cachedItemStruct struct {
@@ -583,15 +584,12 @@ func tryThis(input string) string {
 }
 
 func doLookup() {
-
 	// Scope: See if we can figure out an address to send https requests to..
 
 	if useAddress != "" {
 		print("We will send HTTPS queries to %s", useAddress)
 		return
 	}
-
-	lookFor := "dns.Google.Com"
 
 	// try against []nameservers 1st
 	for _, nameserver := range nameservers {
