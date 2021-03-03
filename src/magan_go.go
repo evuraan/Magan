@@ -465,19 +465,18 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 	} else {
 		fmt.Println("404!")
 	}
-	t2 := time.Now()
-	diff := t2.Sub(t1)
-	meh := "2006-01-02 15:04:05.000"
-	t2.Format(meh)
-	print("Request: %s, took: %s", cacheKey, diff)
-
+	go func() {
+		t2 := time.Now()
+		diff := t2.Sub(t1)
+		meh := "2006-01-02 15:04:05.000"
+		t2.Format(meh)
+		print("Request: %s, took: %s", cacheKey, diff)
+	}()
 	return buf
 }
 
 func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Protocol int) {
-
 	buf := gatherReply(queryBuffer)
-
 	if buf == nil {
 		return
 	}
