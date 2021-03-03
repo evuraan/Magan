@@ -202,8 +202,10 @@ func setupUDPStuff(Port string) {
 	for {
 		buffer := make([]byte, 8192) // udp, won't > 512
 		n, addr, err := conn.ReadFromUDP(buffer)
-
-		checkerr(err)
+		if err != nil {
+			fmt.Printf("UDP Read err: %v\n", err)
+			break
+		}
 		//fmt.Printf("UDP Recvd %d bytes from %s\n", n, addr)
 		print("UDP Recvd %d bytes from %s", n, addr)
 		if n < 5 || n == 0 {
@@ -288,7 +290,9 @@ func doGET(urlPtr *string) (*[]byte, bool) {
 	}
 	req.Header.Set("User-Agent", version)
 	resp, err := client.Do(req)
-	checkerr(err)
+	if err != nil {
+		return nil, false
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
 		contents, err := ioutil.ReadAll(resp.Body)
@@ -494,14 +498,20 @@ func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Pro
 			m.Truncated = true
 			tcReply, _ := m.Pack()
 			SenT, err := conn.WriteToUDP(tcReply, addr)
-			checkerr(err)
-			print("UDP - Replied with %d bytes", SenT)
+			if err != nil {
+				print("UDP - Reply err: %v", err)
+			} else {
+				print("UDP - Replied with %d bytes", SenT)
+			}
 			return
 		}
 
-		SenT, err := conn.WriteToUDP(buf.Bytes(), addr)
-		checkerr(err)
-		print("UDP - Replied with %d bytes", SenT)
+		senT, err := conn.WriteToUDP(buf.Bytes(), addr)
+		if err != nil {
+			print("UDP - Reply err: %v", err)
+		} else {
+			print("UDP - Replied with %d bytes", senT)
+		}
 	}
 
 }
