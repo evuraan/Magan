@@ -376,6 +376,10 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		// 	anCountInt = 0
 		// }
 
+		if (_type == "NS") && (theyAskedFor == ".") {
+			anCountInt = 1
+		}
+
 		tempReply, _ := m.Pack()
 
 		waistDownStruct.ancount = uint16(anCountInt)
@@ -384,10 +388,9 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		binary.Write(buf, binary.BigEndian, tempReply[12:qlen+12])
 
 		for i := 0; i < anCountInt; i++ {
-
-			converted := convert(response.Answer[i].Name)
-			buf.Write([]byte(converted))
-
+			fmt.Printf("Question: %#v, Answer: %#v\n", response.Question, response.Answer[i])
+			convertName := convert(response.Answer[i].Name)
+			buf.Write([]byte(convertName))
 			var dnsRRStruct dnsRRStruct
 			dnsRRStruct.TYPE = uint16(response.Answer[i].Type)
 			dnsRRStruct.CLASS = 1
@@ -403,7 +406,6 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 				binary.Write(buf, binary.BigEndian, a)
 			case 2, 5, 12:
 				mehu := convert(response.Answer[i].Data)
-				fmt.Printf("before convert: %v After conversion: %v\n", response.Answer[i].Data, mehu)
 				dnsRRStruct.RDLEN = uint16(len(mehu))
 				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				buf.Write([]byte(mehu))
@@ -485,6 +487,7 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		t2.Format(meh)
 		print("Request: %s, took: %s", cacheKey, diff)
 	}()
+	fmt.Printf("They asked for %v, reply: %v\n", theyAskedFor, buf)
 	return buf
 }
 
@@ -531,20 +534,12 @@ func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Pro
 
 func convert(_input string) string {
 
-	fmt.Println("Input", _input)
-
-	var b strings.Builder
-
 	if _input == "." {
-		// fmt.Sprintf(x, "%c", 0)
-		fmt.Printf("Single Dotter Input: %s OK?\n", _input)
-		x := ""
-		fmt.Sprintf(x, "%c", 0)
-		return x
+		return ""
 	}
 
 	input := fmt.Sprintf("%s.", _input)
-
+	var b strings.Builder
 	var temp strings.Builder
 	b.Grow(len(input) + 3)
 	temp.Grow(len(input) + 3)
