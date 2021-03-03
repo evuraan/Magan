@@ -1,7 +1,7 @@
 /*
  * ----------------------------------------------------------------------------
     magan : a DoH server
-    Copyright (C) 2019  Evuraan, <evuraan@gmail.com>
+    Copyright (C) Evuraan, <evuraan@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -41,8 +42,22 @@ import (
 
 const (
 	binaryName = "Magan"
-	version    = "Magan/1.3.3b"
+	version    = "Magan/1.5.0a"
+	validity   = 5 * 60 // cache item validity in seconds
+	cacheMax   = 100    // Max items to keep in the cache.
+	interval   = 10     // seconds to wait for house keeping runs
+	lookFor    = "dns.Google.Com"
 )
+
+type cachedItemStruct struct {
+	epoch   int64
+	hitData *[]byte
+}
+
+type cacheStruct struct {
+	sync.RWMutex
+	cacheMap map[string]*cachedItemStruct
+}
 
 //Response exported
 type Response struct {
@@ -91,8 +106,10 @@ var (
 	nameservers = []string{"1.1.1.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"}
 	resolver    *net.Resolver
 	dialer      *net.Dialer
+	cache       = &cacheStruct{}
 	useAddress  = ""
 	routeTo     = ""
+	client      = http.Client{}
 )
 
 func main() {
@@ -146,7 +163,7 @@ func main() {
 	Port := ":" + port
 	print("%s Copyright (C) 2019 Evuraan <evuraan@gmail.com>", version)
 	print("This program comes with ABSOLUTELY NO WARRANTY.")
-	go do_lookup()
+	go doLookup()
 	setupUDPStuff(Port)
 
 }
@@ -169,6 +186,7 @@ func checkerr(err error) {
 func setupUDPStuff(Port string) {
 	// this is the best spot to start our tcp listener  as well.
 	go setupTCPStuff(Port)
+
 	Proto := "udp"
 	// setup *net.UDPAddr first:
 	udpaddr, err := net.ResolveUDPAddr(Proto, Port)
@@ -185,8 +203,10 @@ func setupUDPStuff(Port string) {
 	for {
 		buffer := make([]byte, 8192) // udp, won't > 512
 		n, addr, err := conn.ReadFromUDP(buffer)
-
-		checkerr(err)
+		if err != nil {
+			fmt.Printf("UDP Read err: %v\n", err)
+			break
+		}
 		//fmt.Printf("UDP Recvd %d bytes from %s\n", n, addr)
 		print("UDP Recvd %d bytes from %s", n, addr)
 		if n < 5 || n == 0 {
@@ -203,6 +223,8 @@ func setupTCPStuff(Port string) {
 	tcpListener, err := net.Listen(Proto, Port)
 	checkerr(err)
 	defer tcpListener.Close()
+	// this is a good spot to init our cache
+	go cache.init()
 	for {
 		conn, err := tcpListener.Accept()
 		checkerr(err)
@@ -236,28 +258,16 @@ func doTCPThingy(conn net.Conn) {
 	conn.Close()
 }
 
-func gatherReply(queryBuffer []uint8) *bytes.Buffer {
+func doGET(urlPtr *string) (*[]byte, bool) {
 
-	var m dnsmessage.Message
-	err := m.Unpack(queryBuffer)
-	if err != nil {
-		fmt.Println("Error, outta here", err)
-		return nil
+	if urlPtr == nil {
+		return nil, false
 	}
-	question := m.Questions[0]
-	they_asked_for := question.Name.String()
-	qlen := len(they_asked_for) + 5
-	_type := strings.Replace(question.Type.String(), "Type", "", -1)
-	// https://dns.google.com/resolve?name=www.nbc.com.&type=A
-	//url := "https://dns.google.com/resolve?name=" + they_asked_for + "&type=" + _type
-	url := fmt.Sprintf("https://dns.google.com/resolve?name=%s&type=%s", they_asked_for, _type)
 
-	m.RecursionAvailable = true
-	m.Response = true
-
-	var waistDownStruct waistDownStruct
-	waistDownStruct.qdcount = 1
-	buf := &bytes.Buffer{}
+	url := *urlPtr
+	if len(url) < 1 {
+		return nil, false
+	}
 
 	dialer = &net.Dialer{
 		Timeout:   30 * time.Second,
@@ -269,24 +279,74 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		http.DefaultTransport.(*http.Transport).DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == "dns.google.com:443" {
 				addr = routeTo
-				print("Routing to %s\n", addr)
+				print("Routing to %s", addr)
 			}
 			return dialer.DialContext(ctx, network, addr)
 		}
 	}
 
-	client := http.Client{}
-
 	req, err := http.NewRequest("GET", url, nil)
-	checkerr(err)
+	if err != nil {
+		return nil, false
+	}
 	req.Header.Set("User-Agent", version)
-	t1 := time.Now()
 	resp, err := client.Do(req)
-	checkerr(err)
+	if err != nil {
+		return nil, false
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode == 200 {
+	if resp.StatusCode == http.StatusOK {
 		contents, err := ioutil.ReadAll(resp.Body)
-		checkerr(err)
+		if err != nil {
+			print("Error doing HTTP GETS: %v", err)
+			return nil, false
+		}
+		return &contents, true
+	}
+	return nil, false
+
+}
+
+func gatherReply(queryBuffer []uint8) *bytes.Buffer {
+
+	var m dnsmessage.Message
+	err := m.Unpack(queryBuffer)
+	if err != nil {
+		fmt.Println("Error, outta here", err)
+		return nil
+	}
+	question := m.Questions[0]
+	theyAskedFor := question.Name.String()
+	qlen := len(theyAskedFor) + 5
+	_type := strings.Replace(question.Type.String(), "Type", "", -1)
+	cacheKey := fmt.Sprintf("(%s|%s)", theyAskedFor, _type)
+	t1 := time.Now()
+
+	// cache or lookup?
+	var contents []byte
+	hit, ok := cache.getCachedEntry(&cacheKey)
+	if ok {
+		// print("Cache hit for %s", cacheKey)
+		contents = *hit.hitData
+	} else {
+		// print("Cache miss for %s", cacheKey)
+		url := fmt.Sprintf("https://dns.google.com/resolve?name=%s&type=%s", theyAskedFor, _type)
+		weGot, gok := doGET(&url)
+		if gok {
+			contents = *weGot
+			go cache.insertEntry(&cacheKey, weGot)
+		}
+	}
+
+	m.RecursionAvailable = true
+	m.Response = true
+
+	var waistDownStruct waistDownStruct
+	waistDownStruct.qdcount = 1
+	buf := &bytes.Buffer{}
+
+	if len(contents) > 0 {
+
 		var response Response
 		json.Unmarshal(contents, &response)
 
@@ -405,21 +465,18 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 	} else {
 		fmt.Println("404!")
 	}
-	t2 := time.Now()
-	diff := t2.Sub(t1)
-	meh := "2006-01-02 15:04:05.000"
-	t2.Format(meh)
-	//fmt.Println(t2.Format(meh),url, diff)
-	//fmt.Printf("Url: %s, took: %s\n", url, diff)
-	print("Url: %s, took: %s", url, diff)
-
+	go func() {
+		t2 := time.Now()
+		diff := t2.Sub(t1)
+		meh := "2006-01-02 15:04:05.000"
+		t2.Format(meh)
+		print("Request: %s, took: %s", cacheKey, diff)
+	}()
 	return buf
 }
 
 func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Protocol int) {
-
 	buf := gatherReply(queryBuffer)
-
 	if buf == nil {
 		return
 	}
@@ -441,14 +498,20 @@ func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Pro
 			m.Truncated = true
 			tcReply, _ := m.Pack()
 			SenT, err := conn.WriteToUDP(tcReply, addr)
-			checkerr(err)
-			print("UDP - Replied with %d bytes", SenT)
+			if err != nil {
+				print("UDP - Reply err: %v", err)
+			} else {
+				print("UDP - Replied with %d bytes", SenT)
+			}
 			return
 		}
 
-		SenT, err := conn.WriteToUDP(buf.Bytes(), addr)
-		checkerr(err)
-		print("UDP - Replied with %d bytes", SenT)
+		senT, err := conn.WriteToUDP(buf.Bytes(), addr)
+		if err != nil {
+			print("UDP - Reply err: %v", err)
+		} else {
+			print("UDP - Replied with %d bytes", senT)
+		}
 	}
 
 }
@@ -519,16 +582,13 @@ func tryThis(input string) string {
 
 }
 
-func do_lookup() {
-
+func doLookup() {
 	// Scope: See if we can figure out an address to send https requests to..
 
 	if useAddress != "" {
 		print("We will send HTTPS queries to %s", useAddress)
 		return
 	}
-
-	lookFor := "dns.Google.Com"
 
 	// try against []nameservers 1st
 	for _, nameserver := range nameservers {
@@ -611,4 +671,135 @@ func do_lookup() {
 		}
 	}
 
+}
+
+func (cacheStructPtr *cacheStruct) init() bool {
+	self := cacheStructPtr
+	self.Lock()
+	defer self.Unlock()
+	self.cacheMap = make(map[string]*cachedItemStruct)
+	go self.houseKeeping()
+	return true
+}
+
+func (cacheStructPtr *cacheStruct) getCachedEntry(keyPtr *string) (*cachedItemStruct, bool) {
+	if keyPtr == nil {
+		return nil, false
+	}
+
+	key := *keyPtr
+	if len(key) < 1 {
+		return nil, false
+	}
+
+	self := cacheStructPtr
+	self.RLock()
+	hit, ok := self.cacheMap[key]
+	self.RUnlock()
+
+	if !ok {
+		return nil, false
+	}
+
+	if (hit.epoch + validity) >= time.Now().Unix() {
+		// valid hit. return it.
+		return hit, true
+	}
+
+	// we are here. we had a cache hit, but it is stale.
+	// we must delete the stale entry from the map.
+	hit.hitData = nil
+	hit.epoch = 0
+	go func(staleKey *string) {
+		self.Lock()
+		defer self.Unlock()
+		delete(self.cacheMap, *staleKey)
+	}(keyPtr)
+	// print("Stale hit for %s", key)
+	return nil, false
+}
+
+func (cacheStructPtr *cacheStruct) insertEntry(keyPtr *string, dataPtr *[]byte) bool {
+
+	if keyPtr == nil || dataPtr == nil {
+		return false
+	}
+
+	key := *keyPtr
+	if len(key) < 1 {
+		return false
+	}
+	// print("Inserting cache entry for %s", key)
+	self := cacheStructPtr
+	epoch := time.Now().Unix()
+	self.Lock()
+	defer self.Unlock()
+
+	hit, ok := self.cacheMap[key]
+	if ok {
+		hit.epoch = epoch
+		hit.hitData = dataPtr
+		return true
+	}
+
+	// new item, no prior hits
+	brandNewEntry := &cachedItemStruct{epoch: epoch, hitData: dataPtr}
+	self.cacheMap[key] = brandNewEntry
+	return true
+}
+
+// currently: control items in cache.
+// or: we could simply replace with an empty map
+func (cacheStructPtr *cacheStruct) houseKeeping() {
+	self := cacheStructPtr
+	curLen := 0
+	var nap time.Duration
+	for true {
+		self.RLock()
+		curLen = len(self.cacheMap)
+		self.RUnlock()
+		// print("Cache curlen: %d", curLen)
+		nap = interval * time.Second
+		if curLen > cacheMax {
+			// we must throw an item away.
+			nap = 100 * time.Millisecond
+			if !self.popStaleItem() {
+				// no stale items - we must sacrifice a random map item:
+				self.Lock()
+				for k := range self.cacheMap {
+					delete(self.cacheMap, k)
+					// print("Cache popping: %v", k)
+					break
+				}
+				self.Unlock()
+			}
+		}
+		time.Sleep(nap)
+	}
+}
+
+func (cacheStructPtr *cacheStruct) popStaleItem() bool {
+	self := cacheStructPtr
+	timeNow := time.Now().Unix()
+	mustGo := ""
+	self.RLock()
+	for k := range self.cacheMap {
+		val := self.cacheMap[k]
+		if (val.epoch + validity) < timeNow {
+			// this must go.
+			mustGo = k
+			break
+		}
+	}
+	self.RUnlock()
+
+	if len(mustGo) > 0 {
+		// let us remove this one.
+		self.Lock()
+		defer self.Unlock()
+		delete(self.cacheMap, mustGo)
+		return true
+	}
+
+	return false
 }

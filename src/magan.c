@@ -166,7 +166,7 @@ curl_version_info_data *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/2.0g epoll+pool+cache";
+char Version[] = "Magan/2.0h epoll+pool+cache";
 int LISTEN_PORT = 53;
 int debug = 0;
 pthread_t udpWorkers[UDP_THREADS] = { 0 };
@@ -697,6 +697,7 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 			gotData++;
 		}
 	} else {
+		debug_print("Cache hit for %s\n", Google_url);
 		gotData++;
 	}
 
@@ -1463,26 +1464,27 @@ struct Node *get_CURLHANDLE() {
 // max len: ONE_K
 void findNthWord(char *line_in, int n, char *word) {
 
-	// note: we decay, use another char * to slide and iterate.
-	char *line = line_in;
+        // since we decay, copy the incoming to another buffer
+        char line[bufsize] = { 0 };
+        memcpy(line, line_in, strnlen(line_in, ONE_K));
 
-	int i = 0;
-	char delim[] = " ";
-	char *Field = word;
-	int _len = 0;
-	char *LinePtr = strtok(line, delim);
-	while (LinePtr) {
-		_len = strnlen(LinePtr, ONE_K);
-		if (i == n) {
-			strncpy(Field, LinePtr, _len + 1);
-			break;
-		}
+        int i = 0;
+        char delim[] = " ";
+        char *Field = word;
+        char *LinePtr = strtok(line, delim);
+        while (LinePtr) {
+                int _len = strnlen(LinePtr, ONE_K);
+                if (i == n) {
+                        strncpy(Field, LinePtr, _len + 1);
+			// printf("[%s] nth: %d, Field: %s\n", __func__, n, Field);
+                        break;
+                }
 
-		i++;
-		LinePtr = strtok(NULL, delim);
-	}
+                i++;
+                LinePtr = strtok(NULL, delim);
+        }
 
-	return;
+        return;
 }
 
 int debug_print(char *format, ...) {
