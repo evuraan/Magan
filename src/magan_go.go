@@ -331,6 +331,7 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 	} else {
 		// print("Cache miss for %s", cacheKey)
 		url := fmt.Sprintf("https://dns.google.com/resolve?name=%s&type=%s", theyAskedFor, _type)
+		fmt.Println("url", url)
 		weGot, gok := doGET(&url)
 		if gok {
 			contents = *weGot
@@ -351,6 +352,7 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		json.Unmarshal(contents, &response)
 
 		var anCountInt int = len(response.Answer)
+		fmt.Println("ancount", anCountInt)
 		Rcode := response.Status
 
 		if Rcode == 3 {
@@ -364,6 +366,15 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		} else if Rcode == 5 {
 			m.RCode = 5
 		}
+
+		// round-about way to deny recursive requests.
+		// ra = 0; ancount = 0; rcode = 5 - we should good to go!
+		// if (_type == "NS") && len(theyAskedFor) < 2 {
+		// 	print("Saying no to a recursive trace request")
+		// 	m.RCode = 5
+		// 	m.RecursionAvailable = false
+		// 	anCountInt = 0
+		// }
 
 		tempReply, _ := m.Pack()
 
@@ -392,9 +403,11 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 				binary.Write(buf, binary.BigEndian, a)
 			case 2, 5, 12:
 				mehu := convert(response.Answer[i].Data)
+				fmt.Printf("before convert: %v After conversion: %v\n", response.Answer[i].Data, mehu)
 				dnsRRStruct.RDLEN = uint16(len(mehu))
 				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				buf.Write([]byte(mehu))
+
 			case 16, 99:
 				allRaw := response.Answer[i].Data
 				var mehu string
@@ -518,14 +531,27 @@ func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Pro
 
 func convert(_input string) string {
 
-	input := fmt.Sprintf("%s.", _input)
+	fmt.Println("Input", _input)
+
 	var b strings.Builder
+
+	if _input == "." {
+		// fmt.Sprintf(x, "%c", 0)
+		fmt.Printf("Single Dotter Input: %s OK?\n", _input)
+		x := ""
+		fmt.Sprintf(x, "%c", 0)
+		return x
+	}
+
+	input := fmt.Sprintf("%s.", _input)
+
 	var temp strings.Builder
 	b.Grow(len(input) + 3)
 	temp.Grow(len(input) + 3)
 	j := 0
 
 	for _, v := range input {
+		fmt.Printf("v is %v\n", v)
 		if v == '.' {
 			tempS := temp.String()
 			fmt.Fprintf(&b, "%c%s", j, tempS)
@@ -537,8 +563,9 @@ func convert(_input string) string {
 		}
 	}
 
-	out := b.String()
-	return out
+	// out := b.String()
+	// fmt.Printf("input: %s, output: %s\n", _input, out)
+	return b.String()
 }
 
 func print(strings string, args ...interface{}) {
