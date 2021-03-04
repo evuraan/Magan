@@ -42,7 +42,7 @@ import (
 
 const (
 	binaryName = "Magan"
-	version    = "Magan/1.5.0a"
+	version    = "Magan/1.6"
 	validity   = 5 * 60 // cache item validity in seconds
 	cacheMax   = 100    // Max items to keep in the cache.
 	interval   = 10     // seconds to wait for house keeping runs
@@ -373,10 +373,14 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		binary.Write(buf, binary.BigEndian, tempReply[12:qlen+12])
 
 		for i := 0; i < anCountInt; i++ {
-
-			converted := convert(response.Answer[i].Name)
-			buf.Write([]byte(converted))
-
+			if (_type == "NS") && (theyAskedFor == ".") {
+				if i > 0 {
+					buf.WriteByte(0)
+				}
+			} else {
+				convertName := convert(response.Answer[i].Name)
+				buf.Write([]byte(convertName))
+			}
 			var dnsRRStruct dnsRRStruct
 			dnsRRStruct.TYPE = uint16(response.Answer[i].Type)
 			dnsRRStruct.CLASS = 1
@@ -395,6 +399,7 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 				dnsRRStruct.RDLEN = uint16(len(mehu))
 				binary.Write(buf, binary.BigEndian, dnsRRStruct)
 				buf.Write([]byte(mehu))
+
 			case 16, 99:
 				allRaw := response.Answer[i].Data
 				var mehu string
@@ -536,9 +541,7 @@ func convert(_input string) string {
 			j++
 		}
 	}
-
-	out := b.String()
-	return out
+	return b.String()
 }
 
 func print(strings string, args ...interface{}) {
