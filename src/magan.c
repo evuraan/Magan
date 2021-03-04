@@ -166,12 +166,14 @@ curl_version_info_data *curl_version_data;
 char getter_url[] = "https://dns.google.com/";
 int pid;
 char Name[] = "Magan";
-char Version[] = "Magan/3.0";
+char Version[] = "Magan/3.0a";
 int LISTEN_PORT = 53;
 int debug = 0;
 pthread_t udpWorkers[UDP_THREADS] = { 0 };
 int udpPipe[2] = { 0 };
 struct cacheStruct cache[CACHE_MAX_ITEMS] = { 0 };
+
+char dot[] = ".";
 
 int sockfd = 0;
 
@@ -670,12 +672,6 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 
 	uint16_t queType = ntohs(dns_question.type);
 
-	char Google_url[bufsize] = { 0 };
-	snprintf(Google_url, bufsize, "%sresolve?name=%s&type=%d", getter_url, readable, queType);
-
-	//printf("Google_url: %s\n" , Google_url);
-	debug_print("Url: %s\n", Google_url);
-
 	int Question_Size = end + 1 + sizeof(dns_question);
 	char Question[bufsize] = { 0 };
 
@@ -689,27 +685,32 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 	struct dns_header reply_header = { 0 };
 	memcpy(&reply_header, &header, sizeof(header));	// copy header from request,
 
-	char awkward[bufsize] = { 0 };
-	int gotData = 0;
+	// deduce url to go for:
+	char url[bufsize] = { 0 };
+	char *pointTo = readable;
+	if ((queType == 2) && (!strnlen(readable, 10))) {
+		// a recursive query.
+		pointTo = dot;
+	}
+	snprintf(url, bufsize, "%sresolve?name=%s&type=%d", getter_url, pointTo, queType);
+	debug_print("Url: %s\n", url);
 
 	char *json_buffer = 0;
-
-	if ((queType == 2) && (!strnlen(readable, 10))) {
-		debug_print("Saying no to likely a +trace query\n");
-	} else {
-		json_buffer = getCacheEntry(Google_url);
-		if (!json_buffer) {
-			if (doCurlStuff(Google_url, awkward)) {
-				json_buffer = awkward;
-				gotData++;
-			}
-		} else {
-			debug_print("Cache hit for %s\n", Google_url);
+	char awkward[bufsize] = { 0 };
+	int gotData = 0;
+	json_buffer = getCacheEntry(url);
+	if (!json_buffer) {
+		if (doCurlStuff(url, awkward)) {
+			json_buffer = awkward;
 			gotData++;
 		}
+	} else {
+		debug_print("Cache hit for %s\n", url);
+		gotData++;
 	}
 
 	if (!json_buffer) {
+		// this may need an rcode 5, pivots on gotData below.
 		json_buffer = awkward;
 	}
 
@@ -729,8 +730,6 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 		reply_header.nscount = 0;
 		reply_header.qr = 1;
 	}
-
-
 
 	struct json_object *parsed_json_a, *parsed_json_b;
 	struct json_object *Question_json;
