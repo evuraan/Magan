@@ -42,7 +42,7 @@ import (
 
 const (
 	binaryName = "Magan"
-	version    = "Magan/1.5.0a"
+	version    = "Magan/1.6"
 	validity   = 5 * 60 // cache item validity in seconds
 	cacheMax   = 100    // Max items to keep in the cache.
 	interval   = 10     // seconds to wait for house keeping runs
