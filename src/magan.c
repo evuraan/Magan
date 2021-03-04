@@ -836,7 +836,6 @@ void get_reply(char *request, int PROTO, struct reply *reply, int cut_here) {
 			char *interim_buf = (char *)json_object_get_string(name);
 			convert(con_ns, interim_buf);
 			int end_here = strnlen(con_ns, bufsize);
-			printf("input: %s, output: %s nslen: %d\n", interim_buf, con_ns, end_here);
 			memcpy(R, con_ns, end_here);
 			R += end_here + 1;
 			reply->sendSize += end_here + 1;
