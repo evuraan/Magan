@@ -15,7 +15,7 @@ These days, there is increasing awareness among users to encrypt their traffic, 
 
 The [C](https://github.com/evuraan/Magan/blob/master/src/magan.c) version is recommended; also available are the [Go](https://github.com/evuraan/Magan/blob/master/src/magan_go.go)  and [Python3](https://github.com/evuraan/Magan/blob/master/src/magan.py) variants. 
 
-A few pre-built binaries for Linux and Windows are available [here](https://github.com/evuraan/Magan/tree/master/bin).
+A few pre-built binaries for Linux and Windows are available [here](https://github.com/evuraan/Magan/releases).
 
 See  [here](https://github.com/evuraan/Magan/tree/master/bin) for running Magan as a Windows OS Service. 
 
