@@ -331,7 +331,6 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 	} else {
 		// print("Cache miss for %s", cacheKey)
 		url := fmt.Sprintf("https://dns.google.com/resolve?name=%s&type=%s", theyAskedFor, _type)
-		fmt.Println("url", url)
 		weGot, gok := doGET(&url)
 		if gok {
 			contents = *weGot
@@ -352,7 +351,6 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		json.Unmarshal(contents, &response)
 
 		var anCountInt int = len(response.Answer)
-		fmt.Println("ancount", anCountInt)
 		Rcode := response.Status
 
 		if Rcode == 3 {
@@ -367,19 +365,6 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 			m.RCode = 5
 		}
 
-		// round-about way to deny recursive requests.
-		// ra = 0; ancount = 0; rcode = 5 - we should good to go!
-		// if (_type == "NS") && len(theyAskedFor) < 2 {
-		// 	print("Saying no to a recursive trace request")
-		// 	m.RCode = 5
-		// 	m.RecursionAvailable = false
-		// 	anCountInt = 0
-		// }
-
-		if (_type == "NS") && (theyAskedFor == ".") {
-			anCountInt = 1
-		}
-
 		tempReply, _ := m.Pack()
 
 		waistDownStruct.ancount = uint16(anCountInt)
@@ -388,9 +373,14 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		binary.Write(buf, binary.BigEndian, tempReply[12:qlen+12])
 
 		for i := 0; i < anCountInt; i++ {
-			fmt.Printf("Question: %#v, Answer: %#v\n", response.Question, response.Answer[i])
-			convertName := convert(response.Answer[i].Name)
-			buf.Write([]byte(convertName))
+			if (_type == "NS") && (theyAskedFor == ".") {
+				if i > 0 {
+					buf.WriteByte(0)
+				}
+			} else {
+				convertName := convert(response.Answer[i].Name)
+				buf.Write([]byte(convertName))
+			}
 			var dnsRRStruct dnsRRStruct
 			dnsRRStruct.TYPE = uint16(response.Answer[i].Type)
 			dnsRRStruct.CLASS = 1
@@ -487,7 +477,6 @@ func gatherReply(queryBuffer []uint8) *bytes.Buffer {
 		t2.Format(meh)
 		print("Request: %s, took: %s", cacheKey, diff)
 	}()
-	fmt.Printf("They asked for %v, reply: %v\n", theyAskedFor, buf)
 	return buf
 }
 
@@ -534,10 +523,6 @@ func sendUDPReply(queryBuffer []uint8, conn *net.UDPConn, addr *net.UDPAddr, Pro
 
 func convert(_input string) string {
 
-	if _input == "." {
-		return ""
-	}
-
 	input := fmt.Sprintf("%s.", _input)
 	var b strings.Builder
 	var temp strings.Builder
@@ -546,7 +531,6 @@ func convert(_input string) string {
 	j := 0
 
 	for _, v := range input {
-		fmt.Printf("v is %v\n", v)
 		if v == '.' {
 			tempS := temp.String()
 			fmt.Fprintf(&b, "%c%s", j, tempS)
@@ -557,9 +541,6 @@ func convert(_input string) string {
 			j++
 		}
 	}
-
-	// out := b.String()
-	// fmt.Printf("input: %s, output: %s\n", _input, out)
 	return b.String()
 }
 
